@@ -1,0 +1,48 @@
+
+DROP TABLE IF EXISTS fraudulent_txn;
+CREATE TABLE fraudulent_txn (
+  `event_time` VARCHAR(2147483647),
+  `diff_ms` BIGINT,
+  `account_id` VARCHAR(2147483647),
+  `txn1_id` VARCHAR(2147483647),
+  `txn2_id` VARCHAR(2147483647),
+  `amount` INT,
+  `lat` DOUBLE,
+  `lon` DOUBLE,
+  `lat1` DOUBLE,
+  `lon1` DOUBLE,
+  `distance` DECIMAL(32, 16),
+  `f_name` VARCHAR(2147483647),
+  `l_name` VARCHAR(2147483647),
+  `email` VARCHAR(2147483647),
+  `card` VARCHAR(2147483647),
+  `gender` VARCHAR(2147483647),
+  `phone` VARCHAR(2147483647)
+) WITH (
+  'connector' = 'kafka: edge2ai-kafka',
+  'format' = 'json',
+  'scan.startup.mode' = 'latest-offset',
+  'topic' = 'fraudulent_txn'
+)
+;
+
+DROP TABLE IF EXISTS transactions;
+CREATE TABLE transactions (
+  `ts` BIGINT,
+  `account_id` VARCHAR(2147483647),
+  `transaction_id` VARCHAR(2147483647),
+  `amount` INT,
+  `lat` DOUBLE,
+  `lon` DOUBLE,
+  `fraud_score` DOUBLE,
+  `model_response` ROW<`fraud_score` DOUBLE>,
+  `event_time` AS CAST(from_unixtime(floor(`ts`/1000)) AS TIMESTAMP(3)),
+  WATERMARK FOR `event_time` AS `event_time` - INTERVAL '3' SECOND
+) WITH (
+  'connector' = 'kafka: edge2ai-kafka',
+  'scan.transform.js.code' = 'var parsed = JSON.parse(record.value); parsed.ts = new java.text.SimpleDateFormat(''yyyy-MM-dd HH:mm:ss'').parse(parsed.ts).getTime(); JSON.stringify(parsed);',
+  'format' = 'json',
+  'topic' = 'transactions',
+  'scan.startup.mode' = 'latest-offset'
+)
+;
